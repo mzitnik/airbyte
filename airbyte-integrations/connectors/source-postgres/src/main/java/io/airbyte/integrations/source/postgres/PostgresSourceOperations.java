@@ -13,6 +13,7 @@ import static io.airbyte.db.jdbc.JdbcConstants.INTERNAL_TABLE_NAME;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.gson.Gson;
 import io.airbyte.commons.json.Jsons;
 import io.airbyte.db.DataTypeUtils;
 import io.airbyte.db.jdbc.JdbcSourceOperations;
@@ -23,6 +24,7 @@ import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.util.Collections;
+import java.util.HashMap;
 import org.postgresql.jdbc.PgResultSetMetaData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -76,6 +78,8 @@ public class PostgresSourceOperations extends JdbcSourceOperations {
 
     if (resultSet.getString(colIndex) == null) {
       json.putNull(columnName);
+    } else if (columnTypeName.equalsIgnoreCase("hstore")) {
+      putHstoreAsJson(json, columnName, resultSet, colIndex);
     } else if (columnTypeName.equalsIgnoreCase("bool") || columnTypeName.equalsIgnoreCase("boolean")) {
       putBoolean(json, columnName, resultSet, colIndex);
     } else if (columnTypeName.equalsIgnoreCase("bytea")) {
@@ -167,6 +171,12 @@ public class PostgresSourceOperations extends JdbcSourceOperations {
   private void putMoney(final ObjectNode node, final String columnName, final ResultSet resultSet, final int index) throws SQLException {
     final String moneyValue = parseMoneyValue(resultSet.getString(index));
     node.put(columnName, DataTypeUtils.returnNullIfInvalid(() -> Double.valueOf(moneyValue), Double::isFinite));
+  }
+
+  private void putHstoreAsJson(final ObjectNode node, final String columnName, final ResultSet resultSet, final int index)
+      throws SQLException {
+    HashMap<String, String> data = (HashMap<String, String>) resultSet.getObject(index);
+    node.put(columnName, new Gson().toJson(data));
   }
 
   /**
